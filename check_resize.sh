@@ -61,7 +61,7 @@ find "$PICTURES_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.p
         fi
         
         # Redimensionner l'image (conserve le ratio, ne dépasse pas 1920x1200)
-        mogrify -resize "${MAX_WIDTH}x${MAX_HEIGHT}>" -quality 85 "$image" 2>/dev/null
+        mogrify -auto-orient -resize "${MAX_WIDTH}x${MAX_HEIGHT}>" -quality 85 "$image" 2>/dev/null
         
         if [ $? -eq 0 ]; then
             # Vérifier les nouvelles dimensions
