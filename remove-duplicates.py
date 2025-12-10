@@ -4,6 +4,7 @@
 """
 Script de détection et suppression de photos en double
 Compare les fichiers par leur hash MD5
+Généré par Claude Sonnet 4.5
 """
 
 import os
