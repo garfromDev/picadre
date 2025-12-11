@@ -3,6 +3,8 @@
 Serveur d'upload simple pour cadre photo Raspberry Pi
 Usage: python3 photo_upload.py
 Accès depuis Android: http://IP_DU_PI:8000
+
+Généré par Claude Sonnet 4.5
 """
 
 from flask import Flask, render_template_string, request, jsonify
@@ -15,9 +17,9 @@ from threading import Thread
 import time
 
 # Configuration
-UPLOAD_FOLDER = '/home/pi/photos'  # Modifiez ce chemin selon votre répertoire
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
-SCHEDULE_FILE = '/home/pi/screen_schedule.json'  # Fichier de configuration horaires
+UPLOAD_FOLDER = '/home/picadre/picadre/Picture' 
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic'}
+SCHEDULE_FILE = '/home/picadre/picadre/screen_schedule.json'  # Fichier de configuration horaires
 PORT = 8000
 
 # Créer le dossier s'il n'existe pas
@@ -25,7 +27,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # Limite à 50MB
+app.config['MAX_CONTENT_LENGTH'] = 12 * 1024 * 1024  # Limite à 12MB
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
