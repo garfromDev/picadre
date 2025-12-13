@@ -54,7 +54,7 @@ def control_screen(action):
     """Contrôle l'écran (on/off)"""
     try:
         if action == 'on':
-            cmd = ['wlr-randr', '--output', 'HDMI-A-1', '--on', '--mode', '1920x1080@60']
+            cmd = ['wlr-randr', '--output', 'HDMI-A-1', '--on', '--mode', '1920x1200@59.950001']
         else:  # off
             cmd = ['wlr-randr', '--output', 'HDMI-A-1', '--off']
         
