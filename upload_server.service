@@ -1,3 +1,6 @@
+# service utilisateurpour accéder à la session Wayland
+# doit être placé  dans ~/.config/systemd/user/votre-service.service
+
 [Unit]
 Description=Photo Upload Server
 After=network.target
@@ -10,6 +13,8 @@ WorkingDirectory=/home/picadre/picadre
 ExecStart=/home/picadre/venv_picframe/bin/python3 /home/pi/upload_server.py
 Restart=always
 RestartSec=10
+Environment="WAYLAND_DISPLAY=wayland-0"
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
 
 [Install]
 WantedBy=multi-user.target
