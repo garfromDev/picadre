@@ -52,6 +52,9 @@ def save_schedule(schedule):
 
 def control_screen(action):
     """Contrôle l'écran (on/off)"""
+    env = os.environ.copy()
+    env['WAYLAND_DISPLAY'] = 'wayland-0'
+    env['XDG_RUNTIME_DIR'] = f'/run/user/{os.getuid()}'
     try:
         if action == 'on':
             # ne marche pas à 60hz. Il faut faire wlr-randr pour voir les modes disponibles
@@ -59,7 +62,7 @@ def control_screen(action):
         else:  # off
             cmd = ['wlr-randr', '--output', 'HDMI-A-1', '--off']
         
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True,env=env)
         if result.returncode == 0:
             print(f"✓ Écran {action.upper()}")
             return True
