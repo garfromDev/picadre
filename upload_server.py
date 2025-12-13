@@ -17,7 +17,7 @@ from threading import Thread
 import time
 
 # Configuration
-UPLOAD_FOLDER = '/home/picadre/picadre/Picture' 
+UPLOAD_FOLDER = '/home/picadre/picadre/Pictures' 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic'}
 SCHEDULE_FILE = '/home/picadre/picadre/screen_schedule.json'  # Fichier de configuration horaires
 PORT = 8000
