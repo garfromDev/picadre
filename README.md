@@ -20,3 +20,10 @@ quotidien par crontab
 ## mise à jour du code
 quotidien par git pull sur main via crontab
 
+========
+## dev
+### vérification serveur mqtt
+le serveur se configure dans la section mqtt: de picframe_data/config/
+pour tester, il faut sudo apt install mosquitto-clients pour avoir les commandes
+export BROKER=localhost
+export DEVICE=picframe

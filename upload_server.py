@@ -13,7 +13,7 @@ import json
 import subprocess
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from threading import Thread
+from threading import Thread, Event
 import time
 
 # Configuration
@@ -21,6 +21,11 @@ UPLOAD_FOLDER = '/home/picadre/picadre/Pictures'
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic'}
 SCHEDULE_FILE = '/home/picadre/picadre/screen_schedule.json'  # Fichier de configuration horaires
 PORT = 8000
+
+# MQTT defaults (can be overridden via env vars)
+MQTT_BROKER = os.environ.get('MQTT_BROKER', 'localhost')
+MQTT_PORT = int(os.environ.get('MQTT_PORT', '1883'))
+MQTT_DEVICE_ID = os.environ.get('MQTT_DEVICE_ID', 'picframe')
 
 # Créer le dossier s'il n'existe pas
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -399,6 +404,10 @@ HTML_TEMPLATE = """
             <div id="uploadMessage" class="message"></div>
             <div class="stats">
                 <p>📊 <span id="photoCount">{{ photo_count }}</span> photos dans le cadre</p>
+                <div style="margin-top:15px; text-align:center;">
+                    <button class="btn btn-small" id="showImageAttrsBtn">🛈 Voir l'image affichée</button>
+                </div>
+                <pre id="imageAttrs" style="display:none; text-align:left; background:#f8f9ff; padding:15px; border-radius:10px; margin-top:15px; max-height:200px; overflow:auto;"></pre>
             </div>
         </div>
 
@@ -644,6 +653,33 @@ HTML_TEMPLATE = """
             message.textContent = text;
             message.className = `message ${type}`;
         }
+
+        // ===== MQTT IMAGE ATTRS =====
+        document.getElementById('showImageAttrsBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('showImageAttrsBtn');
+            const pre = document.getElementById('imageAttrs');
+            btn.disabled = true;
+            btn.textContent = '⏳ Chargement...';
+            pre.style.display = 'none';
+            pre.textContent = '';
+            try {
+                const res = await fetch('/mqtt_image');
+                if (!res.ok) {
+                    const err = await res.json();
+                    showMessage('uploadMessage', '❌ ' + (err.error || 'Erreur MQTT'), 'error');
+                } else {
+                    const data = await res.json();
+                    pre.textContent = JSON.stringify(data.attributes, null, 2);
+                    pre.style.display = 'block';
+                    showMessage('uploadMessage', '✅ Attributs reçus', 'success');
+                }
+            } catch (e) {
+                showMessage('uploadMessage', '❌ Erreur de connexion MQTT', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '🛈 Voir l\'image affichée';
+            }
+        });
     </script>
 </body>
 </html>
@@ -715,6 +751,58 @@ def screen():
             return jsonify({'error': 'Échec du contrôle écran'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/mqtt_image', methods=['GET'])
+def mqtt_image():
+    """Récupère les attributs de l'image actuellement affichée via MQTT.
+    Lit le topic Home Assistant créé par pictureFrame:
+    homeassistant/sensor/{device_id}_image/attributes
+    Les variables d'environnement suivantes contrôlent la connexion :
+    MQTT_BROKER, MQTT_PORT, MQTT_DEVICE_ID
+    """
+    try:
+        import paho.mqtt.client as mqtt
+    except Exception:
+        return jsonify({'error': 'paho-mqtt non installé'}), 500
+
+    broker = os.environ.get('MQTT_BROKER', MQTT_BROKER)
+    port = int(os.environ.get('MQTT_PORT', MQTT_PORT))
+    device = os.environ.get('MQTT_DEVICE_ID', MQTT_DEVICE_ID)
+    topic = f"homeassistant/sensor/{device}_image/attributes"
+
+    event = Event()
+    payload_holder = {'payload': None}
+
+    def on_message(client, userdata, message):
+        try:
+            payload = message.payload.decode('utf-8')
+            payload_holder['payload'] = json.loads(payload)
+        except Exception:
+            payload_holder['payload'] = message.payload.decode('utf-8')
+        event.set()
+
+    client = mqtt.Client()
+    client.on_message = on_message
+    try:
+        client.connect(broker, port, 60)
+    except Exception as e:
+        return jsonify({'error': f'Erreur connexion MQTT: {e}'}), 500
+
+    client.subscribe(topic, qos=0)
+    client.loop_start()
+    # attendre jusqu'à 2 secondes pour recevoir un message (souvent retenu)
+    event.wait(2)
+    client.loop_stop()
+    try:
+        client.disconnect()
+    except Exception:
+        pass
+
+    if payload_holder['payload'] is None:
+        return jsonify({'error': 'Pas de message MQTT reçu (vérifier broker/topic/device id)'}), 404
+
+    return jsonify({'attributes': payload_holder['payload']})
 
 if __name__ == '__main__':
     import socket
