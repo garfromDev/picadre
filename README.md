@@ -25,6 +25,22 @@ quotidien par crontab
 ## mise à jour du code
 quotidien par git pull sur main via crontab
 
+## Fonctionnement sur une Pi Zero 2W
+Du fait de la mémoire limitée à 512Mo, il faut éviter les crash par memory error
+- limiterla taille des images (check_resize quotidien)
+- utiliser un swap compressé en mémoire pour augmenter la ram disponible 
+```
+sudo apt update
+sudo apt install zram-tools
+
+# Configurer zram
+echo "ALGO=lz4" | sudo tee -a /etc/default/zramswap
+echo "PERCENT=50" | sudo tee -a /etc/default/zramswap
+
+# Redémarrer le service
+sudo systemctl restart zramswap
+```
+
 ========
 ## dev
 ### vérification serveur mqtt

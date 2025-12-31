@@ -2,4 +2,4 @@
 0 3 * * * /home/picadre/picadre/check_resize.sh
 0 4 * * * /home/picadre/picadre/remove-duplicates.py
 0 5 * * * cd /home/picadre/picadre;git pull origin main
-0 23  * * * /home/picadre/picadre/screen_off.sh
+0 6 * * * rsync -av --password-file=rsync.pwd  --inplace --no-whole-file --partial /home/picadre/Pictures/  rsync://picadre@NAS-ALISTEF:873/BACKUP-PICADRE/
