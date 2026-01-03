@@ -42,10 +42,34 @@ sudo systemctl restart zramswap
 ```
 
 ========
-## dev
-### vérification serveur mqtt
-le serveur se configure dans la section mqtt: de picframe_data/config/
-sudo apt update && sudo apt install mosquitto mosquitto-clients pour installer le broker mqtt
-pour tester, il faut sudo apt install mosquitto-clients pour avoir les commandes
+controle à distance mqtt
+
+installation du broker mqtt et des outils de test: 
+
+````
+sudo apt install mosquitto mosquitto-clients
+sudo systemctl enable --now mosquitto
+````
+
+le client (picframe) se configure dans la section mqtt: de picframe_data/config/
+````
+mqtt:
+  use_mqtt: True                          # default=False. Set True true, to enable mqtt
+  server: "localhost"                     # No defaults for server
+  port: 1883                              # default=8883 for tls, 1883 else (tls must be "" then !!!!!)
+  login: "picadre"                        # your mqtt user
+  password: ""                            # password for mqtt user
+  tls: ""                                 # filename including path to your ca.crt. If not used, must be set to "" !!!!
+  device_id: "picframe"                   # default="picframe" unique id of device. change if there is more than one PictureFrame
+  device_url: ""   
+  ````
+upload_server sera aussi un client connecté au broker, la communication antre upload_server et picframe se fait à travers le broker mqtt
+
+pour tester, il faut sudo apt install mosquitto-clients pour avoir les commandes mosquitto_pub et mosquitto_sub
+````
 export BROKER=localhost
 export DEVICE=picframe
+mosquitto_pub -h $BROKER -t "homeassistant/sensor/picframe_image/attributes" -m '{"filename":"IMG_001.jpg"}' -r
+mosquitto_sub -h $BROKER -C 1 -t "homeassistant/sensor/${DEVICE}_image/attributes" -v
+# doit retourner homeassistant/sensor/picframe_image/attributes {"filename":"IMG_001.jpg"}
+````
