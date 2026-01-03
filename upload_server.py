@@ -790,7 +790,12 @@ def mqtt_image():
             payload_holder['payload'] = message.payload.decode('utf-8')
         event.set()
 
-    client = mqtt.Client()
+    # Use newer Callback API version when available to avoid DeprecationWarning
+    try:
+        client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
+    except Exception:
+        # Older paho-mqtt versions may not have CallbackAPIVersion
+        client = mqtt.Client()
     client.on_message = on_message
     try:
         client.connect(broker, port, 60)
