@@ -685,7 +685,7 @@ HTML_TEMPLATE = """
                 showMessage('uploadMessage', '❌ Erreur de connexion MQTT', 'error');
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🛈 Voir l\'image affichée';
+                btn.textContent = ' Voir l image affichée';
             }
         });
     </script>
