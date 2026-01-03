@@ -15,6 +15,14 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 from threading import Thread, Event
 import time
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s [%(name)s] %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # Configuration
 UPLOAD_FOLDER = '/home/picadre/Pictures' 
@@ -69,18 +77,18 @@ def control_screen(action):
         
         result = subprocess.run(cmd, capture_output=True, text=True,env=env)
         if result.returncode == 0:
-            print(f"✓ Écran {action.upper()}")
+            logger.info("✓ Écran %s", action.upper())
             return True
         else:
-            print(f"✗ Erreur écran {action}: {result.stderr}")
+            logger.error("✗ Erreur écran %s: %s", action, result.stderr)
             return False
-    except Exception as e:
-        print(f"✗ Exception écran {action}: {e}")
+    except Exception:
+        logger.exception("✗ Exception écran %s", action)
         return False
 
 def schedule_monitor():
     """Thread qui surveille les horaires et contrôle l'écran"""
-    print("🕐 Moniteur d'horaires démarré")
+    logger.info("🕐 Moniteur d'horaires démarré")
     last_check = None
     
     while True:
@@ -96,15 +104,15 @@ def schedule_monitor():
                     last_check = current_time
                     
                     if current_time == schedule['on_time']:
-                        print(f"⏰ Heure d'allumage atteinte: {current_time}")
+                        logger.info("⏰ Heure d'allumage atteinte: %s", current_time)
                         control_screen('on')
                     elif current_time == schedule['off_time']:
-                        print(f"⏰ Heure d'extinction atteinte: {current_time}")
+                        logger.info("⏰ Heure d'extinction atteinte: %s", current_time)
                         control_screen('off')
             
             time.sleep(30)  # Vérifier toutes les 30 secondes
-        except Exception as e:
-            print(f"✗ Erreur moniteur: {e}")
+        except Exception:
+            logger.exception("✗ Erreur moniteur")
             time.sleep(60)
 
 # Template HTML avec interface simple et moderne
@@ -713,7 +721,7 @@ def upload_files():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
             file.save(filepath)
             uploaded_count += 1
-            print(f"✓ Photo sauvegardée: {unique_filename}")
+            logger.info("✓ Photo sauvegardée: %s", unique_filename)
     
     # Compter le total de photos
     total_photos = len([f for f in os.listdir(UPLOAD_FOLDER) 
@@ -813,15 +821,15 @@ if __name__ == '__main__':
     monitor_thread = Thread(target=schedule_monitor, daemon=True)
     monitor_thread.start()
     
-    print("\n" + "="*50)
-    print("🚀 Serveur d'upload de photos démarré !")
-    print("="*50)
-    print(f"📁 Dossier de sauvegarde: {UPLOAD_FOLDER}")
-    print(f"🌐 Accès depuis votre Android:")
-    print(f"   → http://{local_ip}:{PORT}")
-    print(f"   → http://localhost:{PORT} (sur le Pi)")
-    print(f"⏰ Moniteur d'horaires: Actif")
-    print("="*50)
-    print("Appuyez sur Ctrl+C pour arrêter\n")
+    logger.info("\n" + "="*50)
+    logger.info("🚀 Serveur d'upload de photos démarré !")
+    logger.info("="*50)
+    logger.info("📁 Dossier de sauvegarde: %s", UPLOAD_FOLDER)
+    logger.info("🌐 Accès depuis votre Android:")
+    logger.info("   → http://%s:%d", local_ip, PORT)
+    logger.info("   → http://localhost:%d (sur le Pi)", PORT)
+    logger.info("⏰ Moniteur d'horaires: Actif")
+    logger.info("="*50)
+    logger.info("Appuyez sur Ctrl+C pour arrêter\n")
     
     app.run(host='0.0.0.0', port=PORT, debug=False)
