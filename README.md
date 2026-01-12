@@ -1,6 +1,16 @@
 # picadre
 Utilities for Raspberry based picframe picture viewer
 
+## Préparation. de la carte
+installer un raspbian sur la carte
+flasher l'image de sauvegarde sur la carte
+
+## Ajout clef ssh si manquante (normalement fournie par l'image)
+ssh-keygen -t ed25519 -C "garfromdev@gmail.com"
+eval "$(ssh-agent -s)"
+ssh-add ~/.ssh/id_ed25519
+Puis ajout de la clef ssh dans github pour cloner le repo picadre
+
 ## requirements
 sudo apt install imagemagick
 
@@ -73,3 +83,10 @@ mosquitto_pub -h $BROKER -t "homeassistant/sensor/picframe_image/attributes" -m 
 mosquitto_sub -h $BROKER -C 1 -t "homeassistant/sensor/${DEVICE}_image/attributes" -v
 # doit retourner homeassistant/sensor/picframe_image/attributes {"filename":"IMG_001.jpg"}
 ````
+
+## dépannage tailscale
+`````
+sudo systemctl stop tailscaled
+sudo mv /var/lib/tailscale/tailscaled.state /var/lib/tailscale/tailscaled.state.backup 2>/dev/null
+sudo systemctl start tailscaled
+`````
