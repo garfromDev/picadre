@@ -10,6 +10,14 @@ Généré par Claude Sonnet 4.5
 import os
 import hashlib
 from collections import defaultdict
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s %(levelname)s [%(name)s] %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # Répertoire à analyser (à modifier selon vos besoins)
 PHOTO_DIR = "/home/picadre/Pictures"
@@ -25,8 +33,8 @@ def calculer_md5(filepath):
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
-    except Exception as e:
-        print(f"Erreur lors de la lecture de {filepath}: {e}")
+    except Exception:
+        logger.exception("Erreur lors de la lecture de %s", filepath)
         return None
 
 def formater_taille(taille_octets):
@@ -38,18 +46,18 @@ def formater_taille(taille_octets):
     return f"{taille_octets:.2f} To"
 
 def main():
-    print("=== Détection des photos en double ===")
-    print(f"Répertoire analysé: {PHOTO_DIR}\n")
+    logger.info("=== Détection des photos en double ===")
+    logger.info("Répertoire analysé: %s", PHOTO_DIR)
     
     # Vérifier que le répertoire existe
     if not os.path.isdir(PHOTO_DIR):
-        print(f"Erreur: Le répertoire '{PHOTO_DIR}' n'existe pas")
+        logger.error("Erreur: Le répertoire '%s' n'existe pas", PHOTO_DIR)
         return
     
     # Dictionnaire pour stocker les fichiers par hash
     fichiers_par_hash = defaultdict(list)
     
-    print("Analyse des fichiers en cours...")
+    logger.info("Analyse des fichiers en cours...")
     
     # Parcourir uniquement les fichiers du répertoire (pas les sous-dossiers)
     for filename in os.listdir(PHOTO_DIR):
@@ -62,10 +70,10 @@ def main():
                 fichiers_par_hash[md5_hash].append(filepath)
     
     if not fichiers_par_hash:
-        print("Aucune photo trouvée dans le répertoire")
+        logger.info("Aucune photo trouvée dans le répertoire")
         return
     
-    print(f"Nombre total de photos analysées: {sum(len(files) for files in fichiers_par_hash.values())}\n")
+    logger.info("Nombre total de photos analysées: %d", sum(len(files) for files in fichiers_par_hash.values()))
     
     # Rechercher et supprimer les doublons
     total_doublons = 0
@@ -73,37 +81,37 @@ def main():
     
     for md5_hash, fichiers in fichiers_par_hash.items():
         if len(fichiers) > 1:
-            print(f"Doublons trouvés (MD5: {md5_hash}):")
+            logger.info("Doublons trouvés (MD5: %s):", md5_hash)
             
             # Afficher tous les fichiers du groupe
             for f in fichiers:
                 taille = os.path.getsize(f)
-                print(f"  - {os.path.basename(f)} ({formater_taille(taille)})")
+                logger.info("  - %s (%s)", os.path.basename(f), formater_taille(taille))
             
             # Garder le premier, supprimer les autres
-            print(f"  ✓ Conservé: {os.path.basename(fichiers[0])}")
+            logger.info("  ✓ Conservé: %s", os.path.basename(fichiers[0]))
             
             for fichier_a_supprimer in fichiers[1:]:
                 taille = os.path.getsize(fichier_a_supprimer)
                 try:
                     os.remove(fichier_a_supprimer)
-                    print(f"  ✗ Supprimé: {os.path.basename(fichier_a_supprimer)}")
+                    logger.info("  ✗ Supprimé: %s", os.path.basename(fichier_a_supprimer))
                     total_doublons += 1
                     espace_libere += taille
-                except Exception as e:
-                    print(f"  ⚠ Erreur lors de la suppression de {os.path.basename(fichier_a_supprimer)}: {e}")
+                except Exception:
+                    logger.exception("  ⚠ Erreur lors de la suppression de %s", os.path.basename(fichier_a_supprimer))
             
-            print()
+            logger.info("")
     
     # Résumé
-    print("=== Résumé ===")
-    print(f"Total de doublons supprimés: {total_doublons}")
+    logger.info("=== Résumé ===")
+    logger.info("Total de doublons supprimés: %d", total_doublons)
     if espace_libere > 0:
-        print(f"Espace disque libéré: {formater_taille(espace_libere)}")
+        logger.info("Espace disque libéré: %s", formater_taille(espace_libere))
     else:
-        print("Aucun doublon trouvé!")
+        logger.info("Aucun doublon trouvé!")
     
-    print("\nOpération terminée!")
+    logger.info("Opération terminée!")
 
 if __name__ == "__main__":
     main()
