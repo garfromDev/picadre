@@ -10,6 +10,14 @@ ssh-keygen -t ed25519 -C "garfromdev@gmail.com"
 eval "$(ssh-agent -s)"
 ssh-add ~/.ssh/id_ed25519
 Puis ajout de la clef ssh dans github pour cloner le repo picadre
+Penser à faire 
+git config --global user.email "garfromdev@gmail.com"
+git config --global user.name "garfromDev"
+
+## backup sur le NAS
+créer le fichier picadre/rsync.pwd contenant le mdp pour lasynchro NAS
+il faut restreindre les droits du fichier rsync.pwd : chmod 600 rsync.pwd
+Le mdp est dans le trousseau du mac sous 192.168.1.25
 
 ## requirements
 sudo apt install imagemagick
@@ -22,8 +30,8 @@ activation du service :
 systemctl --user daemon-reload
 systemctl --user enable upload_server.service
 
-pour ajouter des images depuis son téléphone
-réalisé par un service systemd (systemctl)
+pour ajouter des images depuis son téléphone, se connecter à http://cadrephoto:8000
+
 pour voir les logs : journalctl --user -u upload_server -f
 
 ## redimensionnement des images 
