@@ -1,0 +1,9 @@
+# Simple HTTP reverse proxy for upload_server
+# This serves http://cadrephoto -> http://127.0.0.1:8000
+http://cadrephoto {
+    reverse_proxy 127.0.0.1:8000
+    encode gzip
+    # Optional: log {
+    #   output file /var/log/caddy/picadre.access.log
+    # }
+}

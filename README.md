@@ -32,6 +32,78 @@ systemctl --user enable upload_server.service
 
 pour ajouter des images depuis son téléphone, se connecter à http://cadrephoto:8000
 
+> Option recommandée : créer un reverse‑proxy HTTP local (port 80) pour accéder au service sans préciser de port et sans TLS, utile sur réseau LAN.
+>
+> Ex. Caddyfile (placer dans `/etc/caddy/Caddyfile` ou `/etc/caddy/sites/picadre` selon ton installation) :
+>
+> ```
+> http://cadrephoto {
+>     reverse_proxy 127.0.0.1:8000
+>     encode gzip
+> }
+> ```
+>
+> Installation rapide de Caddy sur Debian / Raspberry Pi OS :
+>
+> ```bash
+> sudo apt update
+> sudo apt install -y debian-keyring debian-archive-keyring apt-transport-https
+> curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+>   | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+> curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+>   | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+> sudo apt update
+> sudo apt install caddy
+> ```
+>
+> Activer/charger la configuration et vérifier :
+>
+> ```bash
+> sudo systemctl enable --now caddy
+> sudo systemctl reload caddy
+> sudo journalctl -u caddy -f
+> ```
+>
+> Exemple d'un fichier `systemd` (si tu veux en fournir un manuellement) :
+> - J'ai ajouté un fichier d'exemple `contrib/caddy.service` dans ce dépôt. Pour l'utiliser :
+>
+> ```bash
+> sudo cp contrib/caddy.service /etc/systemd/system/caddy.service
+> sudo systemctl daemon-reload
+> sudo systemctl enable --now caddy
+> sudo systemctl status caddy
+> ```
+>
+> **Checklist (service root)**
+>
+> 1. Installer Caddy (voir instructions ci‑dessus).
+> 2. Copier le fichier d'unité systemd (root) :
+>
+> ```bash
+> sudo cp contrib/caddy.service.root /etc/systemd/system/caddy.service
+> sudo systemctl daemon-reload
+> sudo systemctl enable --now caddy
+> ```
+>
+> 3. Vérifier le statut et les logs :
+>
+> ```bash
+> sudo systemctl status caddy
+> sudo journalctl -u caddy -f
+> ```
+>
+> 4. Vérifier que le reverse proxy fonctionne depuis un autre poste du LAN :
+>
+> ```bash
+> curl -v http://cadrephoto/   # ou curl -v http://<IP>/:80
+> ```
+>
+> **Remarque sécurité** : exécuter Caddy en tant que **root** fonctionne mais **n'est pas recommandé** pour la production. Privilégie l'exécution en tant qu'utilisateur `caddy` fourni par le paquet lorsque possible.
+>
+> Notes :
+> - Si tu utilises `cadrephoto` comme nom local, ajoute une entrée dans `/etc/hosts` sur les clients (ou configure ton DNS local) : `192.168.x.y cadrephoto`.
+> - Si jamais Safari force HTTPS sur ce nom, utiliser `http://<IP>:8000` directement ou vider les données du site dans Réglages → Safari.
+
 pour voir les logs : journalctl --user -u upload_server -f
 
 ## redimensionnement des images 
