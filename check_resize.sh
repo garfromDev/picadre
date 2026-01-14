@@ -9,7 +9,7 @@
 PICTURES_DIR="$HOME/Pictures"
 MAX_WIDTH=1920
 MAX_HEIGHT=1200
-LOG_FILE="$HOME/tmp/resize_images.log"
+LOG_FILE="$HOME/picadre/resize_images.log"
 BACKUP_DIR="$HOME/Pictures_original_backup"
 
 # Créer le dossier de backup s'il n'existe pas (première exécution)
@@ -69,11 +69,12 @@ while IFS= read -r image; do
         fi
         
         # Redimensionner l'image (conserve le ratio, ne dépasse pas 1920x1200)
-        mogrify -auto-orient -resize "${MAX_WIDTH}x${MAX_HEIGHT}>" -quality 85 "$image" 2>/dev/null
+        # NOTE: Ne pas utiliser -auto-orient ici, picframe gère l'EXIF orientation lui-même
+        mogrify -resize "${MAX_WIDTH}x${MAX_HEIGHT}>" -quality 85 "$image" 2>/dev/null
         
         if [ $? -eq 0 ]; then
             # Vérifier les nouvelles dimensions
-            new_dimensions=$(identify -format "%w %h" "$image" 2>/dev/null)
+            new_dimensions=$(identify -format "%w %h" "$image[0]" 2>/dev/null)
             echo "$(date '+%Y-%m-%d %H:%M:%S') - ✓ Succès: $new_dimensions" >> "$LOG_FILE"
             total_resized=$((total_resized + 1))
         else
