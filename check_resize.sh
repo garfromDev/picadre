@@ -9,7 +9,7 @@
 PICTURES_DIR="$HOME/Pictures"
 MAX_WIDTH=1920
 MAX_HEIGHT=1200
-LOG_FILE="$HOME/tmp/resize_images.log"
+LOG_FILE="$HOME/picadre/resize_images.log"
 BACKUP_DIR="$HOME/Pictures_original_backup"
 
 # Créer le dossier de backup s'il n'existe pas (première exécution)
@@ -33,11 +33,19 @@ total_errors=0
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Début du scan dans $PICTURES_DIR" >> "$LOG_FILE"
 
 # Parcourir tous les fichiers images
-find "$PICTURES_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.bmp" \) | while read -r image; do
+while IFS= read -r image; do
+    # Renommer les fichiers avec espaces en remplaçant par des underscores
+    if [[ "$image" =~ " " ]]; then
+        new_image="${image// /_}"
+        mv "$image" "$new_image"
+        image="$new_image"
+        echo "$(date '+%Y-%m-%d %H:%M:%S') - Fichier renommé: $image" >> "$LOG_FILE"
+    fi
+    
     total_checked=$((total_checked + 1))
     
-    # Obtenir les dimensions de l'image
-    dimensions=$(identify -format "%w %h" "$image" 2>/dev/null)
+    # Obtenir les dimensions de l'image (première frame pour les GIF animés)
+    dimensions=$(identify -format "%w %h" "$image[0]" 2>/dev/null)
     
     if [ $? -ne 0 ]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') - Erreur lecture: $image" >> "$LOG_FILE"
@@ -61,11 +69,12 @@ find "$PICTURES_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.p
         fi
         
         # Redimensionner l'image (conserve le ratio, ne dépasse pas 1920x1200)
-        mogrify -auto-orient -resize "${MAX_WIDTH}x${MAX_HEIGHT}>" -quality 85 "$image" 2>/dev/null
+        # NOTE: Ne pas utiliser -auto-orient ici, picframe gère l'EXIF orientation lui-même
+        mogrify -resize "${MAX_WIDTH}x${MAX_HEIGHT}>" -quality 85 "$image" 2>/dev/null
         
         if [ $? -eq 0 ]; then
             # Vérifier les nouvelles dimensions
-            new_dimensions=$(identify -format "%w %h" "$image" 2>/dev/null)
+            new_dimensions=$(identify -format "%w %h" "$image[0]" 2>/dev/null)
             echo "$(date '+%Y-%m-%d %H:%M:%S') - ✓ Succès: $new_dimensions" >> "$LOG_FILE"
             total_resized=$((total_resized + 1))
         else
@@ -77,7 +86,7 @@ find "$PICTURES_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.p
             fi
         fi
     fi
-done
+done < <(find "$PICTURES_DIR" -type f -mmin -1500 \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.gif" -o -iname "*.bmp" \))
 
 # Résumé dans le log
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Scan terminé" >> "$LOG_FILE"
