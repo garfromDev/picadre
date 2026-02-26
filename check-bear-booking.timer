@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily check for bear watching booking availability at 17:00
+Requires=check-bear-booking.service
+
+[Timer]
+OnCalendar=daily
+OnCalendar=*-*-* 17:00:00
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

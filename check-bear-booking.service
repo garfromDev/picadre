@@ -1,0 +1,16 @@
+[Unit]
+Description=Check bear watching booking availability
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/pi/picadre/.env
+ExecStart=uv run /home/pi/picadre/check_bear_booking.py
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
