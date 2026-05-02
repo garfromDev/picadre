@@ -1,5 +1,7 @@
-# service utilisateurpour accéder à la session Wayland
+# service utilisateur pour accéder à la session Wayland
 # doit être placé  dans ~/.config/systemd/user/votre-service.service
+# il faut activier lingering avec sudo loginctl enable-linger picadre sinon les services utilisateurs
+# ne tournent pas quand  l'utilisateur n'est pas connecté
 
 [Unit]
 Description=Photo Upload Server
