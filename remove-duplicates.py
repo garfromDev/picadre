@@ -12,7 +12,6 @@ import hashlib
 from collections import defaultdict
 import logging
 from PIL import Image
-import imagehash
 import sqlite3
 from pathlib import Path
 
@@ -61,14 +60,17 @@ def formater_taille(taille_octets):
     return f"{taille_octets:.2f} To"
 
 def calculer_hash_pixels(filepath):
-    """Calcule un hash basé uniquement sur les pixels de l'image (ignore les métadonnées)"""
+    """Calcule un hash MD5 sur les pixels de l'image (ignore les métadonnées)"""
     try:
         with Image.open(filepath) as img:
-            # Convertir en RGB si nécessaire pour normaliser
             if img.mode != 'RGB':
                 img = img.convert('RGB')
-            # Calculer le hash perceptuel (aHash - Average Hash)
-            return str(imagehash.average_hash(img))
+            pixels = img.tobytes()
+            return hashlib.md5(pixels).hexdigest()
+    except Image.UnidentifiedImageError:
+        # Fallback : pour les formats non supportés (HEIC, etc.), utiliser hash MD5 binaire
+        logger.info("Format non supporté par PIL, utilisation du hash MD5 binaire: %s", os.path.basename(filepath))
+        return calculer_md5(filepath)
     except Exception:
         logger.exception("Erreur lors du calcul du hash pixels pour %s", filepath)
         return None
@@ -83,6 +85,9 @@ def calculer_hash_md5_pixels(filepath):
             # Obtenir les données de pixels brutes
             pixels = img.tobytes()
             return hashlib.md5(pixels).hexdigest()
+    except Image.UnidentifiedImageError:
+        logger.warning("Fichier image non reconnu (HEIC non supporté ?): %s", filepath)
+        return None
     except Exception:
         logger.exception("Erreur lors du calcul du hash MD5 pixels pour %s", filepath)
         return None
@@ -162,9 +167,22 @@ def supprimer_du_cache_picframe(filepath):
         return False
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Detecter et supprimer photos en double")
+    parser.add_argument("--dry-run", action="store_true", dest="dry_run", help="Afficher les doubles sans supprimer")
+    parser.add_argument("--photo-dir", default=PHOTO_DIR, help="Répertoire à analyser")
+    parser.add_argument("--mode", choices=["md5", "pixels"], default=DETECTION_MODE, help="Mode de détection du hash")
+    args = parser.parse_args()
+
+    dry_run = args.dry_run
+    photo_dir = args.photo_dir
+    mode = args.mode
+
     logger.info("=== Détection des photos en double ===")
-    logger.info("Répertoire analysé: %s", PHOTO_DIR)
-    logger.info("Mode de détection: %s", DETECTION_MODE)
+    logger.info("Répertoire analysé: %s", photo_dir)
+    logger.info("Mode de détection: %s", mode)
+    logger.info("Mode dry-run: %s", dry_run)
     
     # Vérifier que le répertoire existe
     if not os.path.isdir(PHOTO_DIR):
@@ -177,20 +195,21 @@ def main():
     logger.info("Analyse des fichiers en cours...")
     
     # Parcourir uniquement les fichiers du répertoire (pas les sous-dossiers)
-    for filename in os.listdir(PHOTO_DIR):
-        filepath = os.path.join(PHOTO_DIR, filename)
+    for filename in os.listdir(photo_dir):
+        filepath = os.path.join(photo_dir, filename)
         
         # Vérifier que c'est un fichier et qu'il a une extension image
         if os.path.isfile(filepath) and filename.lower().endswith(IMAGE_EXTENSIONS):
-            if DETECTION_MODE == 'pixels':
+            if mode == 'pixels':
                 hash_value = calculer_hash_pixels(filepath)
-                hash_type = "pHash"
-            else:  # mode 'md5' (par défaut)
+                hash_type = "pixels-md5"
+            else:  # mode 'md5' (défaut)
                 hash_value = calculer_md5(filepath)
                 hash_type = "MD5"
             
             if hash_value:
                 fichiers_par_hash[hash_value].append(filepath)
+
     
     if not fichiers_par_hash:
         logger.info("Aucune photo trouvée dans le répertoire")
@@ -217,16 +236,20 @@ def main():
             for fichier_a_supprimer in fichiers[1:]:
                 taille = os.path.getsize(fichier_a_supprimer)
                 try:
-                    # Supprimer du cache picframe avant de supprimer le fichier
-                    supprimer_du_cache_picframe(fichier_a_supprimer)
-                    
-                    # Supprimer le fichier
-                    os.remove(fichier_a_supprimer)
-                    logger.info("  ✗ Supprimé: %s", os.path.basename(fichier_a_supprimer))
-                    total_doublons += 1
-                    espace_libere += taille
+                    if dry_run:
+                        logger.info("  (dry-run) Supprimer du cache : %s", os.path.basename(fichier_a_supprimer))
+                        logger.info("  (dry-run) Supprimer fichier : %s", os.path.basename(fichier_a_supprimer))
+                    else:
+                        # Supprimer du cache picframe avant de supprimer le fichier
+                        supprimer_du_cache_picframe(fichier_a_supprimer)
+                        # Supprimer le fichier
+                        os.remove(fichier_a_supprimer)
+                        logger.info("  ✗ Supprimé: %s", os.path.basename(fichier_a_supprimer))
+                        total_doublons += 1
+                        espace_libere += taille
                 except Exception:
                     logger.exception("  ⚠ Erreur lors de la suppression de %s", os.path.basename(fichier_a_supprimer))
+
             
             logger.info("")
     
