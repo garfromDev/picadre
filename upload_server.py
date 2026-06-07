@@ -11,7 +11,7 @@ from flask import Flask, render_template_string, request, jsonify
 import os
 import json
 import subprocess
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from werkzeug.utils import secure_filename
 from threading import Thread, Event
 import time
@@ -86,31 +86,82 @@ def control_screen(action):
         logger.exception("✗ Exception écran %s", action)
         return False
 
+def _paques(annee):
+    """Dimanche de Pâques (algorithme de Butcher)."""
+    a = annee % 19
+    b = annee // 100
+    c = annee % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mois = (h + l - 7 * m + 114) // 31
+    jour = ((h + l - 7 * m + 114) % 31) + 1
+    return date(annee, mois, jour)
+
+
+def _jours_feries(annee):
+    """Jours fériés français pour une année donnée."""
+    p = _paques(annee)
+    return {
+        date(annee, 1, 1),    # Jour de l'An
+        p + timedelta(1),     # Lundi de Pâques
+        date(annee, 5, 1),    # Fête du Travail
+        date(annee, 5, 8),    # Victoire 1945
+        p + timedelta(39),    # Ascension
+        p + timedelta(50),    # Lundi de Pentecôte
+        date(annee, 7, 14),   # Fête Nationale
+        date(annee, 8, 15),   # Assomption
+        date(annee, 11, 1),   # Toussaint
+        date(annee, 11, 11),  # Armistice
+        date(annee, 12, 25),  # Noël
+    }
+
+
+def _is_jour_special(today=None):
+    """Retourne True si le jour est un week-end ou un jour férié français."""
+    today = today or date.today()
+    return today.weekday() >= 5 or today in _jours_feries(today.year)
+
+
 def schedule_monitor():
-    """Thread qui surveille les horaires et contrôle l'écran"""
+    """Thread qui surveille les horaires et contrôle l'écran."""
     logger.info("🕐 Moniteur d'horaires démarré")
     last_check = None
-    
+
     while True:
         try:
-            schedule = load_schedule()
-            
-            if schedule['enabled']:
-                now = datetime.now()
-                current_time = now.strftime('%H:%M')
-                
-                # Vérifier seulement une fois par minute
-                if current_time != last_check:
-                    last_check = current_time
-                    
+            now = datetime.now()
+            current_time = now.strftime('%H:%M')
+
+            if current_time != last_check:
+                last_check = current_time
+
+                # --- Horaires configurés (semaine) ---
+                schedule = load_schedule()
+                if schedule['enabled']:
                     if current_time == schedule['on_time']:
-                        logger.info("⏰ Heure d'allumage atteinte: %s", current_time)
+                        logger.info("⏰ Allumage programmé: %s", current_time)
                         control_screen('on')
                     elif current_time == schedule['off_time']:
-                        logger.info("⏰ Heure d'extinction atteinte: %s", current_time)
+                        logger.info("⏰ Extinction programmée: %s", current_time)
                         control_screen('off')
-            
-            time.sleep(30)  # Vérifier toutes les 30 secondes
+
+                # --- Week-ends et jours fériés français (indépendant) ---
+                if _is_jour_special():
+                    if current_time == '09:00':
+                        logger.info("⏰ Allumage week-end/férié")
+                        control_screen('on')
+                    elif current_time == '23:00':
+                        logger.info("⏰ Extinction week-end/férié")
+                        control_screen('off')
+
+            time.sleep(30)
         except Exception:
             logger.exception("✗ Erreur moniteur")
             time.sleep(60)
