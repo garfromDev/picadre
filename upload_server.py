@@ -12,6 +12,7 @@ import os
 import json
 import subprocess
 from datetime import date, datetime, timedelta
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.utils import secure_filename
 from threading import Thread, Event
 import time
@@ -40,7 +41,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-app.config['MAX_CONTENT_LENGTH'] = 12 * 1024 * 1024  # Limite à 12MB
+
+MAX_UPLOAD_SIZE_MB = 12
+MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -452,7 +456,7 @@ HTML_TEMPLATE = """
                     <div class="upload-icon">📁</div>
                     <p><strong>Cliquez ici</strong> ou glissez vos photos</p>
                     <p style="font-size: 12px; color: #999; margin-top: 10px;">
-                        JPG, PNG, GIF, WEBP • Max 50MB
+                        JPG, PNG, GIF, WEBP • Max {{ max_upload_size_mb }} MB
                     </p>
                 </div>
                 <input type="file" id="fileInput" name="files" multiple accept="image/*">
@@ -518,8 +522,40 @@ HTML_TEMPLATE = """
 
     <script>
         // Variables globales
+        const MAX_UPLOAD_SIZE = {{ max_upload_size }}; // {{ max_upload_size_mb }} MB
         let selectedFiles = [];
         
+        function clearMessage(elementId) {
+            const message = document.getElementById(elementId);
+            if (!message) return;
+            message.textContent = '';
+            message.className = 'message';
+            message.style.display = 'none';
+        }
+
+        function validateSelectedFiles() {
+            if (selectedFiles.length === 0) {
+                clearMessage('uploadMessage');
+                return true;
+            }
+
+            const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+            const oversizedFile = selectedFiles.find(file => file.size > MAX_UPLOAD_SIZE);
+
+            if (oversizedFile) {
+                showMessage('uploadMessage', `❌ Le fichier ${oversizedFile.name} dépasse la limite de {{ max_upload_size_mb }} MB.`, 'error');
+                return false;
+            }
+
+            if (totalSize > MAX_UPLOAD_SIZE) {
+                showMessage('uploadMessage', '❌ Taille totale des images trop grande (max {{ max_upload_size_mb }} MB).', 'error');
+                return false;
+            }
+
+            clearMessage('uploadMessage');
+            return true;
+        }
+
         // Charger les horaires au démarrage
         loadSchedule();
 
@@ -551,6 +587,7 @@ HTML_TEMPLATE = """
         fileInput.addEventListener('change', (e) => {
             selectedFiles = Array.from(e.target.files);
             displayFileList();
+            validateSelectedFiles();
         });
 
         uploadArea.addEventListener('dragover', (e) => {
@@ -568,6 +605,7 @@ HTML_TEMPLATE = """
             const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
             selectedFiles = files;
             displayFileList();
+            validateSelectedFiles();
         });
 
         function displayFileList() {
@@ -598,6 +636,10 @@ HTML_TEMPLATE = """
                 return;
             }
 
+            if (!validateSelectedFiles()) {
+                return;
+            }
+
             const formData = new FormData();
             selectedFiles.forEach(file => formData.append('files', file));
 
@@ -612,7 +654,12 @@ HTML_TEMPLATE = """
                     body: formData
                 });
 
-                const result = await response.json();
+                let result = null;
+                try {
+                    result = await response.json();
+                } catch (err) {
+                    result = { error: 'Réponse invalide du serveur' };
+                }
 
                 if (response.ok) {
                     showMessage('uploadMessage', `✅ ${result.uploaded} photo(s) envoyée(s) !`, 'success');
@@ -620,8 +667,10 @@ HTML_TEMPLATE = """
                     fileInput.value = '';
                     fileList.innerHTML = '';
                     document.getElementById('photoCount').textContent = result.total_photos;
+                } else if (response.status === 413) {
+                    showMessage('uploadMessage', '❌ Taille des images trop grande. Limite {{ max_upload_size_mb }} MB.', 'error');
                 } else {
-                    showMessage('uploadMessage', `❌ Erreur: ${result.error}`, 'error');
+                    showMessage('uploadMessage', `❌ Erreur: ${result.error || 'Erreur serveur'}`, 'error');
                 }
             } catch (error) {
                 showMessage('uploadMessage', '❌ Erreur de connexion', 'error');
@@ -751,7 +800,9 @@ def index():
     schedule = load_schedule()
     return render_template_string(HTML_TEMPLATE, 
                                  photo_count=photo_count,
-                                 schedule=schedule)
+                                 schedule=schedule,
+                                 max_upload_size_mb=MAX_UPLOAD_SIZE_MB,
+                                 max_upload_size=MAX_UPLOAD_SIZE)
 
 @app.route('/upload', methods=['POST'])
 def upload_files():
@@ -783,6 +834,12 @@ def upload_files():
         'uploaded': uploaded_count,
         'total_photos': total_photos
     })
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_request_entity_too_large(error):
+    return jsonify({
+        'error': f'Taille des images trop grande. Maximum {MAX_UPLOAD_SIZE_MB} MB.',
+    }), 413
 
 @app.route('/schedule', methods=['GET', 'POST'])
 def schedule():
