@@ -1,5 +1,6 @@
 # m h  dom mon dow   command
 0 3 * * * /home/picadre/picadre/check_resize.sh >> resize.log 2>&1
 0 4 * * * /home/picadre/picadre/remove-duplicates.py >> remove_duplicate.log 2>&1
-0 5 * * * cd /home/picadre/picadre;git pull origin main >> gitpull.log 2>&1;systemctl --user restart upload_server
+# La mise à jour du code est désormais gérée par systemd timer update_code.timer
+# 0 5 * * * cd /home/picadre/picadre;git pull origin main >> gitpull.log 2>&1;systemctl --user restart upload_server
 0 6 * * * rsync -av --password-file=rsync.pwd  --inplace --no-whole-file --partial /home/picadre/Pictures/  rsync://picadre@NAS-ALISTEF:873/BACKUP-PICADRE/ >> rsync.log 2>&1

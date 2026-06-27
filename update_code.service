@@ -1,0 +1,12 @@
+[Unit]
+Description=Mettre à jour le code Picadre depuis origin main et relancer upload_server si nécessaire
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/picadre/picadre
+ExecStart=/home/picadre/picadre/update_code.sh
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+
+[Install]
+WantedBy=default.target

@@ -262,7 +262,53 @@ function setupUploadArea() {
     });
 }
 
+function renderErrorStatus(data) {
+    const button = document.getElementById('errorButton');
+    const details = document.getElementById('errorDetails');
+
+    if (!data.has_error) {
+        button.textContent = '✅';
+        button.title = 'Aucune erreur récente détectée';
+        button.dataset.errorText = 'Aucune erreur récente enregistrée.';
+        details.style.display = 'none';
+        return;
+    }
+
+    button.textContent = '⚠️';
+    button.title = 'Cliquez pour afficher la dernière erreur';
+    button.dataset.errorText = data.last_error || 'Erreur non disponible.';
+}
+
+function toggleErrorDetails() {
+    const button = document.getElementById('errorButton');
+    const details = document.getElementById('errorDetails');
+
+    if (details.style.display === 'block') {
+        details.style.display = 'none';
+        return;
+    }
+
+    details.textContent = button.dataset.errorText || 'Aucune erreur enregistrée.';
+    details.style.display = 'block';
+}
+
+async function fetchErrorStatus() {
+    try {
+        const response = await fetch('/error_status');
+        if (!response.ok) {
+            return;
+        }
+        const data = await response.json();
+        renderErrorStatus(data);
+    } catch (error) {
+        console.error('Erreur chargement status erreur:', error);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     setupUploadArea();
     loadSchedule();
+    fetchErrorStatus();
+    document.getElementById('errorButton').addEventListener('click', toggleErrorDetails);
+    setInterval(fetchErrorStatus, 60000);
 });

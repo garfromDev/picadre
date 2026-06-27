@@ -15,8 +15,14 @@
     <div class="container">
         <!-- Onglet Upload -->
         <div id="uploadTab" class="tab-content active">
-            <h1>📸 Cadre Photo</h1>
-            <p class="subtitle">Ajoutez vos photos au cadre</p>
+            <div class="status-row">
+                <div>
+                    <h1>📸 Cadre Photo</h1>
+                    <p class="subtitle">Ajoutez vos photos au cadre</p>
+                </div>
+                <button id="errorButton" class="error-button" type="button" title="Vérifier les erreurs">✅</button>
+            </div>
+            <pre id="errorDetails" class="error-details" style="display: none;"></pre>
 
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="upload-area" id="uploadArea">

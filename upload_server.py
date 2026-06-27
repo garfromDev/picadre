@@ -20,11 +20,30 @@ import logging
 from schedule_manager import load_schedule, save_schedule, _is_jour_special
 from screen_control import control_screen
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LOG_FILE = os.path.join(BASE_DIR, 'upload_server.log')
+MAX_LOG_LINES = 200
+
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s %(levelname)s [%(name)s] %(message)s',
-)
+formatter = logging.Formatter('%(asctime)s %(levelname)s [%(name)s] %(message)s')
+stream_handler = logging.StreamHandler()
+stream_handler.setLevel(logging.INFO)
+stream_handler.setFormatter(formatter)
+file_handler = logging.FileHandler(LOG_FILE, encoding='utf-8')
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.handlers = []
+root_logger.addHandler(stream_handler)
+root_logger.addHandler(file_handler)
+
+app = Flask(__name__)
+app.logger.handlers = []
+app.logger.setLevel(logging.INFO)
+app.logger.addHandler(stream_handler)
+app.logger.addHandler(file_handler)
 logger = logging.getLogger(__name__)
 
 # Configuration
@@ -40,12 +59,33 @@ MQTT_DEVICE_ID = os.environ.get('MQTT_DEVICE_ID', 'picframe')
 # Créer le dossier s'il n'existe pas
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 MAX_UPLOAD_SIZE_MB = 12
 MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE
+
+
+def read_last_error_lines(max_lines=MAX_LOG_LINES):
+    if not os.path.exists(LOG_FILE):
+        return []
+
+    filtered = []
+    with open(LOG_FILE, 'r', encoding='utf-8', errors='ignore') as fh:
+        for line in fh:
+            if 'ERROR' in line or 'CRITICAL' in line or 'Traceback' in line:
+                filtered.append(line.rstrip('\n'))
+
+    return filtered[-max_lines:]
+
+
+@app.route('/error_status')
+def error_status():
+    errors = read_last_error_lines()
+    return jsonify({
+        'has_error': bool(errors),
+        'last_error': '\n'.join(errors) if errors else '',
+    })
 
 
 def allowed_file(filename):

@@ -41,7 +41,19 @@ quotidien par crontab
 quotidien par crontab
 
 ## mise à jour du code
-quotidien par git pull sur main via crontab
+La mise à jour du code se fait désormais via un service systemd dédié et un timer.
+
+- `update_code.timer` exécute `update_code.service` chaque matin à 05:00.
+- `update_code.service` lance `update_code.sh` qui fait un `git fetch`/`git pull` puis redémarre `upload_server` uniquement si du nouveau code est disponible.
+- Les erreurs de démarrage ou d’exécution sont également consignées dans `upload_server.log`.
+
+Pour activer le timer utilisateur :
+```bash
+cp update_code.service ~/.config/systemd/user/update_code.service
+cp update_code.timer ~/.config/systemd/user/update_code.timer
+systemctl --user daemon-reload
+systemctl --user enable --now update_code.timer
+```
 
 ## Fonctionnement sur une Pi Zero 2W
 Du fait de la mémoire limitée à 512Mo, il faut éviter les crash par memory error
