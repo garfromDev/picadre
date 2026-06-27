@@ -28,44 +28,33 @@ def supprimer_du_cache_picframe(filepath):
         logger.warning("Base de données picframe non trouvée")
         return False
 
+    filepath = os.path.abspath(filepath)
+    folder_path = os.path.dirname(filepath)
+    filename = os.path.basename(filepath)
+    name_without_ext = os.path.splitext(filename)[0]
+    ext = os.path.splitext(filename)[1][1:] if '.' in filename else ''
+
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
 
-        filepath = os.path.abspath(filepath)
-        folder_path = os.path.dirname(filepath)
-        filename = os.path.basename(filepath)
-        name_without_ext = os.path.splitext(filename)[0]
-        ext = os.path.splitext(filename)[1][1:] if '.' in filename else ''
+            cursor.execute("SELECT folder_id FROM folder WHERE name = ?", (folder_path,))
+            folder_result = cursor.fetchone()
+            if not folder_result:
+                logger.debug("Dossier %s non trouvé dans le cache", folder_path)
+                return False
 
-        cursor.execute("SELECT folder_id FROM folder WHERE name = ?", (folder_path,))
-        folder_result = cursor.fetchone()
+            cursor.execute(
+                "SELECT file_id FROM file WHERE folder_id = ? AND basename = ? AND extension = ?",
+                (folder_result[0], name_without_ext, ext)
+            )
+            file_result = cursor.fetchone()
+            if not file_result:
+                logger.debug("Fichier %s non trouvé dans le cache", filename)
+                return False
 
-        if not folder_result:
-            logger.debug("Dossier %s non trouvé dans le cache", folder_path)
-            conn.close()
-            return False
-
-        folder_id = folder_result[0]
-
-        cursor.execute(
-            "SELECT file_id FROM file WHERE folder_id = ? AND basename = ? AND extension = ?",
-            (folder_id, name_without_ext, ext)
-        )
-        file_result = cursor.fetchone()
-
-        if not file_result:
-            logger.debug("Fichier %s non trouvé dans le cache", filename)
-            conn.close()
-            return False
-
-        file_id = file_result[0]
-
-        cursor.execute("DELETE FROM meta WHERE file_id = ?", (file_id,))
-        cursor.execute("DELETE FROM file WHERE file_id = ?", (file_id,))
-
-        conn.commit()
-        conn.close()
+            cursor.execute("DELETE FROM meta WHERE file_id = ?", (file_result[0],))
+            cursor.execute("DELETE FROM file WHERE file_id = ?", (file_result[0],))
 
         logger.info("  ✓ Entrée supprimée du cache picframe: %s", filename)
         return True
