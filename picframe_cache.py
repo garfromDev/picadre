@@ -53,8 +53,9 @@ def supprimer_du_cache_picframe(filepath):
                 logger.debug("Fichier %s non trouvé dans le cache", filename)
                 return False
 
-            cursor.execute("DELETE FROM meta WHERE file_id = ?", (file_result[0],))
-            cursor.execute("DELETE FROM file WHERE file_id = ?", (file_result[0],))
+            file_id = file_result[0]
+            cursor.execute("DELETE FROM meta WHERE file_id = ?", (file_id,))
+            cursor.execute("DELETE FROM file WHERE file_id = ?", (file_id,))
 
         logger.info("  ✓ Entrée supprimée du cache picframe: %s", filename)
         return True
