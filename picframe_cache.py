@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+import logging
+import os
+import sqlite3
+
+logger = logging.getLogger(__name__)
+
+POSSIBLE_CACHE_PATHS = [
+    "/home/picadre/.picframe/picframe.db",
+    "/home/picadre/.cache/picframe/picframe.db",
+    os.path.expanduser("~/.picframe/picframe.db"),
+    os.path.expanduser("~/.cache/picframe/picframe.db"),
+]
+
+
+def trouver_db_picframe():
+    """Trouve le chemin de la base de données picframe"""
+    for db_path in POSSIBLE_CACHE_PATHS:
+        if os.path.exists(db_path):
+            return db_path
+    return None
+
+
+def supprimer_du_cache_picframe(filepath):
+    """Supprime une image du cache SQLite de picframe"""
+    db_path = trouver_db_picframe()
+    if not db_path:
+        logger.warning("Base de données picframe non trouvée")
+        return False
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        filepath = os.path.abspath(filepath)
+        folder_path = os.path.dirname(filepath)
+        filename = os.path.basename(filepath)
+        name_without_ext = os.path.splitext(filename)[0]
+        ext = os.path.splitext(filename)[1][1:] if '.' in filename else ''
+
+        cursor.execute("SELECT folder_id FROM folder WHERE name = ?", (folder_path,))
+        folder_result = cursor.fetchone()
+
+        if not folder_result:
+            logger.debug("Dossier %s non trouvé dans le cache", folder_path)
+            conn.close()
+            return False
+
+        folder_id = folder_result[0]
+
+        cursor.execute(
+            "SELECT file_id FROM file WHERE folder_id = ? AND basename = ? AND extension = ?",
+            (folder_id, name_without_ext, ext)
+        )
+        file_result = cursor.fetchone()
+
+        if not file_result:
+            logger.debug("Fichier %s non trouvé dans le cache", filename)
+            conn.close()
+            return False
+
+        file_id = file_result[0]
+
+        cursor.execute("DELETE FROM meta WHERE file_id = ?", (file_id,))
+        cursor.execute("DELETE FROM file WHERE file_id = ?", (file_id,))
+
+        conn.commit()
+        conn.close()
+
+        logger.info("  ✓ Entrée supprimée du cache picframe: %s", filename)
+        return True
+
+    except sqlite3.Error as e:
+        logger.error("Erreur lors de l'accès au cache picframe: %s", e)
+        return False
+    except Exception as e:
+        logger.exception("Erreur inattendue lors de la suppression du cache: %s", e)
+        return False

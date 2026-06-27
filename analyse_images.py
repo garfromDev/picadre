@@ -6,22 +6,11 @@ Script d'analyse détaillée de deux images pour identifier les différences
 """
 
 import os
-import hashlib
-import subprocess
 from PIL import Image
 import sys
 
-def calculer_md5(filepath):
-    """Calcule le hash MD5 d'un fichier"""
-    hash_md5 = hashlib.md5()
-    try:
-        with open(filepath, "rb") as f:
-            for chunk in iter(lambda: f.read(4096), b""):
-                hash_md5.update(chunk)
-        return hash_md5.hexdigest()
-    except Exception as e:
-        print(f"Erreur lors de la lecture de {filepath}: {e}")
-        return None
+from hash_utils import calculer_md5
+
 
 def analyser_images(file1, file2):
     print("=== Analyse détaillée des deux images ===")
@@ -29,7 +18,6 @@ def analyser_images(file1, file2):
     print(f"Fichier 2: {file2}")
     print()
 
-    # Vérifier l'existence des fichiers
     if not os.path.exists(file1):
         print(f"Erreur: {file1} n'existe pas")
         return
@@ -67,14 +55,12 @@ def analyser_images(file1, file2):
         print(f"Taille 2: {img2.size}")
         print()
 
-        # Vérifier si les pixels sont identiques
         if img1.size == img2.size and img1.mode == img2.mode:
             pixels_identiques = list(img1.getdata()) == list(img2.getdata())
             print(f"Pixels identiques: {pixels_identiques}")
         else:
             print("Les images ont des dimensions ou modes différents")
 
-        # Métadonnées EXIF
         print("\n=== Métadonnées ===")
         exif1 = img1.info if hasattr(img1, 'info') else {}
         exif2 = img2.info if hasattr(img2, 'info') else {}
@@ -99,7 +85,6 @@ def analyser_images(file1, file2):
             if data1 == data2:
                 print("Les fichiers sont identiques au niveau binaire")
             else:
-                # Trouver les premières différences
                 min_len = min(len(data1), len(data2))
                 diff_pos = None
                 for i in range(min_len):
@@ -112,7 +97,6 @@ def analyser_images(file1, file2):
                     print(f"Octet fichier 1: 0x{data1[diff_pos]:02x} ({data1[diff_pos]})")
                     print(f"Octet fichier 2: 0x{data2[diff_pos]:02x} ({data2[diff_pos]})")
 
-                    # Afficher le contexte autour de la différence
                     start = max(0, diff_pos - 10)
                     end = min(min_len, diff_pos + 10)
                     print(f"Contexte fichier 1: {data1[start:end].hex()}")
@@ -123,6 +107,7 @@ def analyser_images(file1, file2):
 
     except Exception as e:
         print(f"Erreur lors de l'analyse binaire: {e}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:

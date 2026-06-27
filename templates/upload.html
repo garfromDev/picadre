@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📸 Upload Photos</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/upload.css') }}">
+</head>
+<body>
+    <div class="nav-tabs">
+        <button class="nav-tab active" onclick="switchTab('upload')">📤 Upload</button>
+        <button class="nav-tab" onclick="switchTab('schedule')">⏰ Horaires</button>
+    </div>
+
+    <div class="container">
+        <!-- Onglet Upload -->
+        <div id="uploadTab" class="tab-content active">
+            <h1>📸 Cadre Photo</h1>
+            <p class="subtitle">Ajoutez vos photos au cadre</p>
+
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📁</div>
+                    <p><strong>Cliquez ici</strong> ou glissez vos photos</p>
+                    <p class="upload-hint">
+                        JPG, PNG, GIF, WEBP • Max {{ max_upload_size_mb }} MB
+                    </p>
+                </div>
+                <input type="file" id="fileInput" name="files" multiple accept="image/*">
+                <button type="submit" class="btn" id="uploadBtn">📤 Envoyer les photos</button>
+            </form>
+
+            <div id="fileList" class="file-list"></div>
+            <div id="uploadMessage" class="message"></div>
+            <div class="stats">
+                <p>📊 <span id="photoCount">{{ photo_count }}</span> photos dans le cadre</p>
+                <div class="centered">
+                    <button class="btn btn-small" id="showImageAttrsBtn">🛈 Voir l'image affichée</button>
+                </div>
+                <pre id="imageAttrs" class="image-attrs"></pre>
+            </div>
+        </div>
+
+        <!-- Onglet Horaires -->
+        <div id="scheduleTab" class="tab-content">
+            <h1>⏰ Horaires Écran</h1>
+            <p class="subtitle">Allumage et extinction automatiques</p>
+
+            <div class="screen-status">
+                <div class="screen-status-indicator" id="screenStatus">🔲</div>
+                <div id="screenStatusText">État inconnu</div>
+            </div>
+
+            <div class="toggle-container">
+                <span class="toggle-label">Programmation automatique</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="scheduleEnabled">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="schedule-section">
+                <div class="time-setting">
+                    <label class="time-label">🌅 Heure d'allumage</label>
+                    <input type="time" id="onTime" class="time-input" value="{{ schedule.on_time }}">
+                </div>
+
+                <div class="time-setting">
+                    <label class="time-label">🌙 Heure d'extinction</label>
+                    <input type="time" id="offTime" class="time-input" value="{{ schedule.off_time }}">
+                </div>
+
+                <button class="btn" onclick="saveSchedule()">💾 Sauvegarder les horaires</button>
+            </div>
+
+            <div class="schedule-section">
+                <p class="manual-control-title">
+                    Contrôle manuel
+                </p>
+                <div class="btn-group">
+                    <button class="btn btn-small" onclick="controlScreen('on')">🟢 Allumer</button>
+                    <button class="btn btn-small" onclick="controlScreen('off')">🔴 Éteindre</button>
+                </div>
+            </div>
+
+            <div id="scheduleMessage" class="message"></div>
+        </div>
+    </div>
+
+    <script>
+        window.uploadConfig = {
+            maxUploadSize: {{ max_upload_size }},
+            maxUploadSizeMb: {{ max_upload_size_mb }}
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+</body>
+</html>
