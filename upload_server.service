@@ -7,13 +7,13 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/picadre/picadre
+WorkingDirectory=%h/picadre
 # Utilisez le Python de la venv picframe
-ExecStart=/home/picadre/venv_picframe/bin/python3 /home/picadre/picadre/upload_server.py
+ExecStart=%h/venv_picframe/bin/python3 %h/picadre/upload_server.py
 Restart=always
 RestartSec=10
 Environment="WAYLAND_DISPLAY=wayland-0"
-Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="XDG_RUNTIME_DIR=/run/user/%U"
 
 [Install]
 WantedBy=default.target

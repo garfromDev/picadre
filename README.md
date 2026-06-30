@@ -44,13 +44,15 @@ quotidien par crontab
 La mise à jour du code se fait désormais via un service systemd dédié et un timer.
 
 - `update_code.timer` exécute `update_code.service` chaque matin à 05:00.
-- `update_code.service` lance `update_code.sh` qui fait un `git fetch`/`git pull` puis redémarre `upload_server` uniquement si du nouveau code est disponible.
+- `update_code.service` lance `update_code.sh`, qui exécute d'abord `setup.sh`, puis fait un `git fetch`/`git pull` et redémarre `upload_server` uniquement si du nouveau code est disponible.
+- `setup.sh` installe et active automatiquement les unités `upload_server.service`, `update_code.service` et `update_code.timer` dans `~/.config/systemd/user` si elles n'existent pas.
 - Les erreurs de démarrage ou d’exécution sont également consignées dans `upload_server.log`.
 
 Pour activer le timer utilisateur :
 ```bash
 cp update_code.service ~/.config/systemd/user/update_code.service
 cp update_code.timer ~/.config/systemd/user/update_code.timer
+cp upload_server.service ~/.config/systemd/user/upload_server.service
 systemctl --user daemon-reload
 systemctl --user enable --now update_code.timer
 ```

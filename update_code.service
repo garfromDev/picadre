@@ -4,9 +4,9 @@ After=network.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/picadre/picadre
-ExecStart=/home/picadre/picadre/update_code.sh
-Environment="XDG_RUNTIME_DIR=/run/user/1000"
+WorkingDirectory=%h/picadre
+ExecStart=%h/picadre/update_code.sh
+Environment="XDG_RUNTIME_DIR=/run/user/%U"
 
 [Install]
 WantedBy=default.target

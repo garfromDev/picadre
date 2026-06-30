@@ -7,6 +7,8 @@ LOG_FILE="$BASE_DIR/update_code.log"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Début de la mise à jour du code" >> "$LOG_FILE"
 cd "$BASE_DIR"
 
+bash "$BASE_DIR/setup.sh" >> "$LOG_FILE" 2>&1
+
 git fetch origin main >> "$LOG_FILE" 2>&1
 if ! REMOTE=$(git rev-parse @{u} 2>/dev/null); then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Erreur: branche actuelle sans upstream configuré" >> "$LOG_FILE"
