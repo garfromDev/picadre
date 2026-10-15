@@ -162,16 +162,10 @@ function validateFiles(files) {
         return true;
     }
 
-    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
     const oversizedFile = files.find(file => file.size > MAX_UPLOAD_SIZE);
 
     if (oversizedFile) {
         showMessage('uploadMessage', `❌ Le fichier ${oversizedFile.name} dépasse la limite de ${MAX_UPLOAD_SIZE_MB} MB.`, 'error');
-        return false;
-    }
-
-    if (totalSize > MAX_UPLOAD_SIZE) {
-        showMessage('uploadMessage', `❌ Taille totale des images trop grande (max ${MAX_UPLOAD_SIZE_MB} MB).`, 'error');
         return false;
     }
 
@@ -229,69 +223,88 @@ async function handleUploadSubmit(event) {
 
     const uploadBtn = document.getElementById('uploadBtn');
     uploadBtn.disabled = true;
-    uploadBtn.textContent = '⏳ Préparation des photos...';
     clearMessage('uploadMessage');
 
-    let stage = 'préparation';
+    const filesToUpload = [...selectedFiles];
+    const uploadedIndexes = new Set();
+    const failures = [];
+    const conversionFallbacks = [];
+    const metadataFailures = [];
+
     try {
-        const preparedResults = [];
-        for (const file of selectedFiles) {
-            preparedResults.push(await prepareUploadFile(file));
-        }
+        for (let index = 0; index < filesToUpload.length; index++) {
+            const originalFile = filesToUpload[index];
+            const progress = `${index + 1}/${filesToUpload.length}`;
+            uploadBtn.textContent = `⏳ Préparation ${progress}...`;
 
-        const preparedFiles = preparedResults.map(result => result.file);
-        if (!validateFiles(preparedFiles)) {
-            return;
-        }
-
-        const formData = new FormData();
-        preparedFiles.forEach(file => formData.append('files', file));
-
-        stage = 'envoi';
-        uploadBtn.textContent = '⏳ Envoi en cours...';
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData
-        });
-
-        let result = null;
-        try {
-            result = await response.json();
-        } catch (err) {
-            result = { error: 'Réponse invalide du serveur' };
-        }
-
-        if (response.ok) {
-            const conversionFallbacks = preparedResults
-                .filter(item => item.conversionError)
-                .map(item => item.file.name);
-            const metadataFailures = preparedResults
-                .filter(item => item.metadataError)
-                .map(item => item.file.name);
-            let message = `✅ ${result.uploaded} photo(s) envoyée(s) !`;
-            if (conversionFallbacks.length) {
-                message += ` Conversion HEIC impossible pour ${conversionFallbacks.join(', ')}; fichier(s) original(aux) envoyé(s).`;
+            let prepared;
+            try {
+                prepared = await prepareUploadFile(originalFile);
+            } catch (error) {
+                console.error(`Préparation impossible pour ${originalFile.name}:`, error);
+                failures.push(`${originalFile.name} (préparation impossible)`);
+                continue;
             }
-            if (metadataFailures.length) {
-                message += ` Métadonnées EXIF non conservées pour ${metadataFailures.join(', ')}.`;
+
+            if (!validateFiles([prepared.file])) {
+                failures.push(`${originalFile.name} (dépasse ${MAX_UPLOAD_SIZE_MB} MB)`);
+                continue;
             }
-            showMessage('uploadMessage', message, conversionFallbacks.length || metadataFailures.length ? 'warning' : 'success');
-            selectedFiles = [];
-            document.getElementById('fileInput').value = '';
-            document.getElementById('fileList').innerHTML = '';
-            document.getElementById('photoCount').textContent = result.total_photos;
-        } else if (response.status === 413) {
-            showMessage('uploadMessage', `❌ Taille des images trop grande. Limite ${MAX_UPLOAD_SIZE_MB} MB.`, 'error');
-        } else {
-            showMessage('uploadMessage', `❌ Erreur: ${result.error || 'Erreur serveur'}`, 'error');
+
+            if (prepared.conversionError) conversionFallbacks.push(originalFile.name);
+            if (prepared.metadataError) metadataFailures.push(originalFile.name);
+
+            const formData = new FormData();
+            formData.append('files', prepared.file);
+            uploadBtn.textContent = `⏳ Envoi ${progress}...`;
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                let result = null;
+                try {
+                    result = await response.json();
+                } catch (error) {
+                    console.error(`Réponse invalide pour ${originalFile.name}:`, error);
+                }
+
+                if (response.ok && result?.uploaded > 0) {
+                    uploadedIndexes.add(index);
+                    if (Number.isFinite(result.total_photos)) {
+                        document.getElementById('photoCount').textContent = result.total_photos;
+                    }
+                } else if (response.status === 413) {
+                    failures.push(`${originalFile.name} (dépasse ${MAX_UPLOAD_SIZE_MB} MB)`);
+                } else {
+                    failures.push(`${originalFile.name} (${result?.error || 'erreur serveur'})`);
+                }
+            } catch (error) {
+                console.error(`Envoi impossible pour ${originalFile.name}:`, error);
+                failures.push(`${originalFile.name} (erreur de connexion)`);
+            }
         }
-    } catch (error) {
-        console.error(`Erreur pendant la ${stage} des photos:`, error);
-        showMessage(
-            'uploadMessage',
-            stage === 'préparation' ? '❌ Erreur pendant la préparation des photos' : '❌ Erreur de connexion',
-            'error'
-        );
+
+        selectedFiles = filesToUpload.filter((file, index) => !uploadedIndexes.has(index));
+        document.getElementById('fileInput').value = '';
+        displayFileList();
+
+        const successfulCount = uploadedIndexes.size;
+        let message = `✅ ${successfulCount} photo(s) envoyée(s) sur ${filesToUpload.length}.`;
+        if (failures.length) {
+            message += ` Échec(s) : ${failures.join(', ')}.`;
+        }
+        if (conversionFallbacks.length) {
+            message += ` Conversion HEIC impossible pour ${conversionFallbacks.join(', ')}; fichier(s) original(aux) envoyé(s).`;
+        }
+        if (metadataFailures.length) {
+            message += ` Métadonnées EXIF non conservées pour ${metadataFailures.join(', ')}.`;
+        }
+
+        const hasWarnings = failures.length || conversionFallbacks.length || metadataFailures.length;
+        showMessage('uploadMessage', message, failures.length && !successfulCount ? 'error' : hasWarnings ? 'warning' : 'success');
     } finally {
         uploadBtn.disabled = false;
         uploadBtn.textContent = '📤 Envoyer les photos';
