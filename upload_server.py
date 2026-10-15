@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 UPLOAD_FOLDER = '/home/picadre/Pictures'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic', 'heif'}
 PORT = 8000
 
 # MQTT defaults (can be overridden via env vars)

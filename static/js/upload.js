@@ -2,6 +2,152 @@ const MAX_UPLOAD_SIZE = window.uploadConfig?.maxUploadSize ?? 0;
 const MAX_UPLOAD_SIZE_MB = window.uploadConfig?.maxUploadSizeMb ?? 0;
 let selectedFiles = [];
 
+function isHeicFile(file) {
+    return /\.(heic|heif)$/i.test(file.name) || /hei[cf]/i.test(file.type);
+}
+
+async function convertHeicToJpeg(file) {
+    const url = URL.createObjectURL(file);
+    let canvas;
+
+    try {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+
+        const scale = Math.min(1, 2560 / Math.max(image.naturalWidth, image.naturalHeight));
+        canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.naturalWidth * scale);
+        canvas.height = Math.round(image.naturalHeight * scale);
+
+        const context = canvas.getContext('2d');
+        if (!context) {
+            throw new Error('Impossible de créer le contexte de dessin');
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.88));
+        if (!blob) {
+            throw new Error('La création du JPEG a échoué');
+        }
+        return blob;
+    } finally {
+        if (canvas) {
+            canvas.width = 0;
+            canvas.height = 0;
+        }
+        URL.revokeObjectURL(url);
+    }
+}
+
+function formatExifDate(value) {
+    if (value instanceof Date) {
+        const pad = number => String(number).padStart(2, '0');
+        return `${value.getFullYear()}:${pad(value.getMonth() + 1)}:${pad(value.getDate())} ` +
+            `${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}`;
+    }
+    return typeof value === 'string' ? value : null;
+}
+
+async function readExifMetadata(file) {
+    const metadata = {};
+    try {
+        const tags = await exifr.parse(file, {
+            reviveValues: false
+        });
+        if (tags) {
+            metadata.make = tags.Make;
+            metadata.model = tags.Model;
+            metadata.date = formatExifDate(tags.DateTimeOriginal);
+        }
+
+        const gps = await exifr.gps(file);
+        if (gps && Number.isFinite(gps.latitude) && Number.isFinite(gps.longitude)) {
+            metadata.latitude = gps.latitude;
+            metadata.longitude = gps.longitude;
+        }
+        return { metadata, error: null };
+    } catch (error) {
+        console.warn(`Lecture des métadonnées EXIF impossible pour ${file.name}:`, error);
+        return { metadata, error };
+    }
+}
+
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error('Lecture du JPEG impossible'));
+            }
+        };
+        reader.onerror = () => reject(reader.error || new Error('Lecture du JPEG impossible'));
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function addExifMetadata(blob, metadata) {
+    const zeroth = {};
+    const exif = {};
+    const gps = {};
+
+    if (metadata.make) zeroth[piexif.ImageIFD.Make] = metadata.make;
+    if (metadata.model) zeroth[piexif.ImageIFD.Model] = metadata.model;
+    if (metadata.date) {
+        zeroth[piexif.ImageIFD.DateTime] = metadata.date;
+        exif[piexif.ExifIFD.DateTimeOriginal] = metadata.date;
+        exif[piexif.ExifIFD.DateTimeDigitized] = metadata.date;
+    }
+    if (metadata.latitude != null && metadata.longitude != null) {
+        gps[piexif.GPSIFD.GPSLatitudeRef] = metadata.latitude < 0 ? 'S' : 'N';
+        gps[piexif.GPSIFD.GPSLatitude] = piexif.GPSHelper.degToDmsRational(Math.abs(metadata.latitude));
+        gps[piexif.GPSIFD.GPSLongitudeRef] = metadata.longitude < 0 ? 'W' : 'E';
+        gps[piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(metadata.longitude));
+    }
+
+    if (!Object.keys(zeroth).length && !Object.keys(gps).length) {
+        return blob;
+    }
+
+    const exifBytes = piexif.dump({ '0th': zeroth, Exif: exif, GPS: gps });
+    const jpegWithExif = piexif.insert(exifBytes, await blobToDataUrl(blob));
+    return await (await fetch(jpegWithExif)).blob();
+}
+
+async function prepareUploadFile(file) {
+    if (!isHeicFile(file)) {
+        return { file, conversionError: null, metadataError: null };
+    }
+
+    const { metadata, error: metadataError } = await readExifMetadata(file);
+    try {
+        const blob = await convertHeicToJpeg(file);
+        let jpeg = blob;
+        let exifError = metadataError;
+        try {
+            jpeg = await addExifMetadata(blob, metadata);
+        } catch (error) {
+            console.warn(`Réinjection des métadonnées EXIF impossible pour ${file.name}:`, error);
+            exifError = error;
+        }
+
+        const baseName = file.name.replace(/\.[^.]+$/, '') || 'photo';
+        return {
+            file: new File([jpeg], `${baseName}.jpg`, {
+                type: 'image/jpeg',
+                lastModified: file.lastModified
+            }),
+            conversionError: null,
+            metadataError: exifError
+        };
+    } catch (error) {
+        console.warn(`Conversion HEIC impossible pour ${file.name}; envoi du fichier original:`, error);
+        return { file, conversionError: error, metadataError: null };
+    }
+}
+
 function clearMessage(elementId) {
     const message = document.getElementById(elementId);
     if (!message) return;
@@ -10,14 +156,14 @@ function clearMessage(elementId) {
     message.style.display = 'none';
 }
 
-function validateSelectedFiles() {
-    if (selectedFiles.length === 0) {
+function validateFiles(files) {
+    if (files.length === 0) {
         clearMessage('uploadMessage');
         return true;
     }
 
-    const totalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
-    const oversizedFile = selectedFiles.find(file => file.size > MAX_UPLOAD_SIZE);
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    const oversizedFile = files.find(file => file.size > MAX_UPLOAD_SIZE);
 
     if (oversizedFile) {
         showMessage('uploadMessage', `❌ Le fichier ${oversizedFile.name} dépasse la limite de ${MAX_UPLOAD_SIZE_MB} MB.`, 'error');
@@ -31,6 +177,10 @@ function validateSelectedFiles() {
 
     clearMessage('uploadMessage');
     return true;
+}
+
+function validateSelectedFiles() {
+    return validateFiles(selectedFiles.filter(file => !isHeicFile(file)));
 }
 
 function switchTab(tab) {
@@ -77,19 +227,28 @@ async function handleUploadSubmit(event) {
         return;
     }
 
-    if (!validateSelectedFiles()) {
-        return;
-    }
-
-    const formData = new FormData();
-    selectedFiles.forEach(file => formData.append('files', file));
-
     const uploadBtn = document.getElementById('uploadBtn');
     uploadBtn.disabled = true;
-    uploadBtn.textContent = '⏳ Envoi en cours...';
+    uploadBtn.textContent = '⏳ Préparation des photos...';
     clearMessage('uploadMessage');
 
+    let stage = 'préparation';
     try {
+        const preparedResults = [];
+        for (const file of selectedFiles) {
+            preparedResults.push(await prepareUploadFile(file));
+        }
+
+        const preparedFiles = preparedResults.map(result => result.file);
+        if (!validateFiles(preparedFiles)) {
+            return;
+        }
+
+        const formData = new FormData();
+        preparedFiles.forEach(file => formData.append('files', file));
+
+        stage = 'envoi';
+        uploadBtn.textContent = '⏳ Envoi en cours...';
         const response = await fetch('/upload', {
             method: 'POST',
             body: formData
@@ -103,7 +262,20 @@ async function handleUploadSubmit(event) {
         }
 
         if (response.ok) {
-            showMessage('uploadMessage', `✅ ${result.uploaded} photo(s) envoyée(s) !`, 'success');
+            const conversionFallbacks = preparedResults
+                .filter(item => item.conversionError)
+                .map(item => item.file.name);
+            const metadataFailures = preparedResults
+                .filter(item => item.metadataError)
+                .map(item => item.file.name);
+            let message = `✅ ${result.uploaded} photo(s) envoyée(s) !`;
+            if (conversionFallbacks.length) {
+                message += ` Conversion HEIC impossible pour ${conversionFallbacks.join(', ')}; fichier(s) original(aux) envoyé(s).`;
+            }
+            if (metadataFailures.length) {
+                message += ` Métadonnées EXIF non conservées pour ${metadataFailures.join(', ')}.`;
+            }
+            showMessage('uploadMessage', message, conversionFallbacks.length || metadataFailures.length ? 'warning' : 'success');
             selectedFiles = [];
             document.getElementById('fileInput').value = '';
             document.getElementById('fileList').innerHTML = '';
@@ -114,7 +286,12 @@ async function handleUploadSubmit(event) {
             showMessage('uploadMessage', `❌ Erreur: ${result.error || 'Erreur serveur'}`, 'error');
         }
     } catch (error) {
-        showMessage('uploadMessage', '❌ Erreur de connexion', 'error');
+        console.error(`Erreur pendant la ${stage} des photos:`, error);
+        showMessage(
+            'uploadMessage',
+            stage === 'préparation' ? '❌ Erreur pendant la préparation des photos' : '❌ Erreur de connexion',
+            'error'
+        );
     } finally {
         uploadBtn.disabled = false;
         uploadBtn.textContent = '📤 Envoyer les photos';
@@ -227,7 +404,7 @@ function setupUploadArea() {
     uploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
         uploadArea.classList.remove('dragover');
-        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || isHeicFile(f));
         selectedFiles = files;
         displayFileList();
         validateSelectedFiles();

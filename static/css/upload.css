@@ -157,6 +157,12 @@ input[type="file"] {
     display: block;
 }
 
+.warning {
+    background: #fff3cd;
+    color: #856404;
+    display: block;
+}
+
 .file-list {
     margin-top: 20px;
     max-height: 200px;
