@@ -31,6 +31,7 @@ systemctl --user daemon-reload
 systemctl --user enable upload_server.service
 
 pour ajouter des images depuis son téléphone, se connecter à http://cadrephoto:8000
+Les photos HEIC/HEIF sont converties dans le navigateur en JPEG redimensionné (2560 px max) quand le navigateur sait les lire. La date et le GPS EXIF sont conservés lorsque disponibles. Si la conversion échoue, le fichier d'origine est envoyé et le serveur doit pouvoir lire le HEIC/HEIF.
 
 pour voir les logs : journalctl --user -u upload_server -f
 

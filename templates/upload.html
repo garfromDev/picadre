@@ -29,10 +29,10 @@
                     <div class="upload-icon">📁</div>
                     <p><strong>Cliquez ici</strong> ou glissez vos photos</p>
                     <p class="upload-hint">
-                        JPG, PNG, GIF, WEBP • Max {{ max_upload_size_mb }} MB
+                        JPG, PNG, GIF, WEBP, HEIC/HEIF • Max {{ max_upload_size_mb }} MB
                     </p>
                 </div>
-                <input type="file" id="fileInput" name="files" multiple accept="image/*">
+                <input type="file" id="fileInput" name="files" multiple accept="image/*,.heic,.heif">
                 <button type="submit" class="btn" id="uploadBtn">📤 Envoyer les photos</button>
             </form>
 
@@ -99,6 +99,8 @@
             maxUploadSizeMb: {{ max_upload_size_mb }}
         };
     </script>
+    <script src="{{ url_for('static', filename='js/exifr.lite.umd.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/piexif.js') }}"></script>
     <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
 </body>
 </html>

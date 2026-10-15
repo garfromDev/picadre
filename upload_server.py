@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 UPLOAD_FOLDER = '/home/picadre/Pictures'
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic'}
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'heic', 'heif'}
 PORT = 8000
 
 # MQTT defaults (can be overridden via env vars)
@@ -63,7 +63,8 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 MAX_UPLOAD_SIZE_MB = 12
 MAX_UPLOAD_SIZE = MAX_UPLOAD_SIZE_MB * 1024 * 1024
-app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE
+MAX_MULTIPART_OVERHEAD = 64 * 1024
+app.config['MAX_CONTENT_LENGTH'] = MAX_UPLOAD_SIZE + MAX_MULTIPART_OVERHEAD
 
 
 def read_last_error_lines(max_lines=MAX_LOG_LINES):
